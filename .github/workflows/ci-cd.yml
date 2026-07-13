@@ -40,13 +40,11 @@ jobs:
 
       - name: Build Docker Image
         run: |
-          docker build \
-          -t ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG} .
+          docker build -t ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG} .
 
       - name: Push Docker Image
         run: |
-          docker push \
-          ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}
+          docker push ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}
 
       - name: Deploy to Compute Engine
         run: |

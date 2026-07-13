@@ -5,10 +5,61 @@ on:
     branches:
       - main
 
+env:
+  PROJECT_ID: ${{ secrets.PROJECT_ID }}
+  GAR_REGION: ${{ secrets.GAR_REGION }}
+  GAR_REPOSITORY: ${{ secrets.GAR_REPOSITORY }}
+  IMAGE_NAME: my-app
+  IMAGE_TAG: "1.0"
+  VM_NAME: ${{ secrets.VM_NAME }}
+  VM_ZONE: ${{ secrets.VM_ZONE }}
+
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
-      - name: Checkout Source Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker Authentication
+        run: |
+          gcloud auth configure-docker ${GAR_REGION}-docker.pkg.dev --quiet
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+          -t ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG} .
+
+      - name: Push Docker Image
+        run: |
+          docker push \
+          ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}
+
+      - name: Deploy to Compute Engine
+        run: |
+          gcloud compute ssh ${VM_NAME} \
+          --zone=${VM_ZONE} \
+          --command="
+          gcloud auth configure-docker ${GAR_REGION}-docker.pkg.dev --quiet &&
+          docker pull ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG} &&
+          docker stop my-app || true &&
+          docker rm my-app || true &&
+          docker run -d \
+            --name my-app \
+            -p 3000:3000 \
+            --restart always \
+            ${GAR_REGION}-docker.pkg.dev/${PROJECT_ID}/${GAR_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}
+          "
